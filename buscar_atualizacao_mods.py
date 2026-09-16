@@ -22,16 +22,15 @@ headers = {
 mods = [
     "appleskin", "atmospherics", "axiom", "better-clouds", "betterf3",
     "bettergrassify", "c2me-fabric", "chat-heads", "chatanimation", "cloth-config",
-    "continuity", "dynamic-fps", "entityculling", "essential", "fabric-api",
+    "continuity", "dynamic-fps", "entityculling", "essential-mod", "fabric-api",
     "carpet", "fabric-language-kotlin", "fadeless", "ferrite-core",
     "forge-config-api-port", "freecam", "gamma-utils", "geckolib", "immediatelyfast",
     "inventory-particles", "iris", "krypton", "litematica", "lithium", "malilib",
-    "modmenu", "mossylib", "mouse-tweaks", "mru", "no-enderman-grief",
-    "optigui", "particle-rain", "puzzles-lib", "reeses-sodium-options",
+    "modmenu", "mossylib", "mouse-tweaks", "mru", "music-tweaks", "no-enderman-grief",
+    "optigui", "particlerain", "puzzles-lib", "reeses-sodium-options",
     "shulkerboxtooltip", "simply-no-shading", "3dskinlayers", "sodium-extra",
     "sodium", "status-effect-bars", "voxy", "xaeros-world-map", "yacl", "zoomify"
 ]
-
 def load_manifest():
     """Carrega o histórico de mods baixados."""
     if os.path.exists(MANIFEST_FILE):
