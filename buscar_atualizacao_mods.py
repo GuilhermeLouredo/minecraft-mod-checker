@@ -57,7 +57,6 @@ def get_mod_file(mod_slug, target_version, target_loader):
             if response.status == 200:
                 versions = json.loads(response.read().decode())
                 for v in versions:
-                    # Filtra apenas a versão exata (exclui snapshots, pre-releases e RCs)
                     has_version = any(gv == target_version for gv in v.get("game_versions", []))
                     has_loader = target_loader in v.get("loaders", [])
                     
