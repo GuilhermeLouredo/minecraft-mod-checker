@@ -20,9 +20,9 @@ headers = {
 }
 
 mods = [
-    "appleskin", "atmospherics", "axiom", "better-clouds", "betterf3",
+    "appleskin", "atmospherics", "orthocamera", "axiom", "better-clouds", "betterf3",
     "bettergrassify", "c2me-fabric", "chat-heads", "chatanimation", "cloth-config",
-    "continuity", "dynamic-fps", "entityculling", "essential-mod", "fabric-api",
+    "continuity", "dynamic-fps", "entityculling", "essential", "fabric-api",
     "carpet", "fabric-language-kotlin", "fadeless", "ferrite-core",
     "forge-config-api-port", "freecam", "gamma-utils", "geckolib", "immediatelyfast",
     "inventory-particles", "iris", "krypton", "litematica", "lithium", "malilib",
@@ -31,6 +31,9 @@ mods = [
     "shulkerboxtooltip", "simply-no-shading", "3dskinlayers", "sodium-extra",
     "sodium", "status-effect-bars", "voxy", "xaeros-world-map", "yacl", "zoomify"
 ]
+
+FLEXIBLE_MODS = {"essential"}
+
 def load_manifest():
     """Carrega o histórico de mods baixados."""
     if os.path.exists(MANIFEST_FILE):
@@ -47,30 +50,49 @@ def save_manifest(manifest):
         json.dump(manifest, f, indent=4)
 
 def get_mod_file(mod_slug, target_version, target_loader):
-    """Consulta a API do Modrinth e retorna o .jar mais recente com compatibilidade EXATA."""
+    """Retorna o .jar mais recente com compatibilidade exata.
+    Para mods em FLEXIBLE_MODS, cai para o mais recente do loader se não houver exata."""
     url = f"https://api.modrinth.com/v2/project/{mod_slug}/version"
     req = urllib.request.Request(url, headers=headers)
-    
+
+    def pick_file(v):
+        files = v.get("files", [])
+        primary = next((f for f in files if f.get("primary")), files[0] if files else None)
+        if primary:
+            return {"filename": primary["filename"], "url": primary["url"]}
+        return None
+
     try:
         with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
-            if response.status == 200:
-                versions = json.loads(response.read().decode())
-                for v in versions:
-                    has_version = any(gv == target_version for gv in v.get("game_versions", []))
-                    has_loader = target_loader in v.get("loaders", [])
-                    
-                    if has_version and has_loader:
-                        files = v.get("files", [])
-                        primary_file = next((f for f in files if f.get("primary")), files[0] if files else None)
-                        
-                        if primary_file:
-                            return {
-                                "filename": primary_file["filename"],
-                                "url": primary_file["url"]
-                            }
+            if response.status != 200:
                 return None
+            versions = json.loads(response.read().decode())
     except Exception:
         return None
+
+    for v in versions:
+        if target_version in v.get("game_versions", []) and target_loader in v.get("loaders", []):
+            result = pick_file(v)
+            if result:
+                return result
+
+    if mod_slug in FLEXIBLE_MODS:
+        loader_versions = [
+            v for v in versions
+            if target_loader in v.get("loaders", []) and v.get("version_type") == "release"
+        ]
+
+        version_tags = (target_version.replace(".", "-"), target_version)
+        for v in loader_versions:
+            result = pick_file(v)
+            if result and any(tag in result["filename"] for tag in version_tags):
+                return result
+
+        for v in loader_versions:
+            result = pick_file(v)
+            if result:
+                return result
+
     return None
 
 def download_file(url, destination_path):
@@ -86,7 +108,7 @@ print(f"Sincronizando mods APENAS para a versão final {TARGET_VERSION} ({TARGET
 
 for mod in mods:
     mod_data = get_mod_file(mod, TARGET_VERSION, TARGET_LOADER)
-    
+
     if not mod_data:
         print(f"[PENDENTE]    {mod:<22} -> Sem versão final estável")
         continue
@@ -101,16 +123,16 @@ for mod in mods:
         print(f"[EM DIA]      {mod:<22} -> {latest_filename}")
         continue
 
-    if current_installed and current_installed != latest_filename:
-        old_file_path = os.path.join(DOWNLOAD_DIR, current_installed)
-        if os.path.exists(old_file_path):
-            try:
-                os.remove(old_file_path)
-                print(f"[ATUALIZANDO] {mod:<22} -> Removendo {current_installed}...", end=" ", flush=True)
-            except Exception as e:
-                print(f"[ERRO CLEAN]  Não foi possível remover {current_installed}: {e}")
+    old_file_path = os.path.join(DOWNLOAD_DIR, current_installed) if current_installed else None
+
+    if current_installed and current_installed != latest_filename and os.path.exists(old_file_path):
+        print(f"[ATUALIZANDO] {mod:<22} -> Removendo {current_installed}...", end=" ", flush=True)
+        try:
+            os.remove(old_file_path)
+        except Exception as e:
+            print(f"\n[ERRO CLEAN]  Não foi possível remover {current_installed}: {e}")
         print(f"Baixando {latest_filename}...", end=" ", flush=True)
-    
+
     else:
         print(f"[BAIXANDO]    {mod:<22} -> {latest_filename}...", end=" ", flush=True)
 
