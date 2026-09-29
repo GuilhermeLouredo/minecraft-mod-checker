@@ -32,8 +32,6 @@ mods = [
     "sodium", "status-effect-bars", "voxy", "xaeros-world-map", "yacl", "zoomify"
 ]
 
-# Mods que não marcam a versão nova no Modrinth, mas funcionam nela.
-# Se não houver versão exata, usa o release mais recente do loader.
 FLEXIBLE_MODS = {"essential"}
 
 def load_manifest():
@@ -72,29 +70,24 @@ def get_mod_file(mod_slug, target_version, target_loader):
     except Exception:
         return None
 
-    # 1) Compatibilidade exata (comportamento original)
     for v in versions:
         if target_version in v.get("game_versions", []) and target_loader in v.get("loaders", []):
             result = pick_file(v)
             if result:
                 return result
 
-    # 2) Fallback só para mods flexíveis (a API já devolve do mais novo pro mais antigo)
     if mod_slug in FLEXIBLE_MODS:
         loader_versions = [
             v for v in versions
             if target_loader in v.get("loaders", []) and v.get("version_type") == "release"
         ]
 
-        # 2a) Prefere o jar cujo nome de arquivo contém a versão do jogo
-        #     (ex.: essential_1-5-0-1_fabric_26-3.jar)
         version_tags = (target_version.replace(".", "-"), target_version)
         for v in loader_versions:
             result = pick_file(v)
             if result and any(tag in result["filename"] for tag in version_tags):
                 return result
 
-        # 2b) Último recurso: o release mais recente do loader
         for v in loader_versions:
             result = pick_file(v)
             if result:
