@@ -32,6 +32,8 @@ mods = [
     "sodium", "status-effect-bars", "voxy", "xaeros-world-map", "yacl", "zoomify"
 ]
 
+# Mods que não marcam a versão nova no Modrinth, mas funcionam nela.
+# Se não houver versão exata, usa o release mais recente do loader.
 FLEXIBLE_MODS = {"essential"}
 
 def load_manifest():
@@ -70,24 +72,29 @@ def get_mod_file(mod_slug, target_version, target_loader):
     except Exception:
         return None
 
+    # 1) Compatibilidade exata (comportamento original)
     for v in versions:
         if target_version in v.get("game_versions", []) and target_loader in v.get("loaders", []):
             result = pick_file(v)
             if result:
                 return result
 
+    # 2) Fallback só para mods flexíveis (a API já devolve do mais novo pro mais antigo)
     if mod_slug in FLEXIBLE_MODS:
         loader_versions = [
             v for v in versions
             if target_loader in v.get("loaders", []) and v.get("version_type") == "release"
         ]
 
+        # 2a) Prefere o jar cujo nome de arquivo contém a versão do jogo
+        #     (ex.: essential_1-5-0-1_fabric_26-3.jar)
         version_tags = (target_version.replace(".", "-"), target_version)
         for v in loader_versions:
             result = pick_file(v)
             if result and any(tag in result["filename"] for tag in version_tags):
                 return result
 
+        # 2b) Último recurso: o release mais recente do loader
         for v in loader_versions:
             result = pick_file(v)
             if result:
@@ -106,11 +113,18 @@ installed_manifest = load_manifest()
 
 print(f"Sincronizando mods APENAS para a versão final {TARGET_VERSION} ({TARGET_LOADER.title()})...\n")
 
+baixados = []
+atualizados = []
+em_dia = []
+pendentes = []
+falhas = []
+
 for mod in mods:
     mod_data = get_mod_file(mod, TARGET_VERSION, TARGET_LOADER)
 
     if not mod_data:
         print(f"[PENDENTE]    {mod:<22} -> Sem versão final estável")
+        pendentes.append(mod)
         continue
 
     latest_filename = mod_data["filename"]
@@ -121,11 +135,15 @@ for mod in mods:
 
     if current_installed == latest_filename and os.path.exists(dest_path):
         print(f"[EM DIA]      {mod:<22} -> {latest_filename}")
+        em_dia.append(mod)
         continue
 
     old_file_path = os.path.join(DOWNLOAD_DIR, current_installed) if current_installed else None
 
+    acao = "baixado"
+
     if current_installed and current_installed != latest_filename and os.path.exists(old_file_path):
+        acao = "atualizado"
         print(f"[ATUALIZANDO] {mod:<22} -> Removendo {current_installed}...", end=" ", flush=True)
         try:
             os.remove(old_file_path)
@@ -141,12 +159,33 @@ for mod in mods:
         installed_manifest[mod] = latest_filename
         save_manifest(installed_manifest)
         print("Concluído!")
+        if acao == "atualizado":
+            atualizados.append(mod)
+        else:
+            baixados.append(mod)
     except Exception as e:
         print(f"Falha ao baixar ({e})")
+        falhas.append(mod)
 
 pasta_completa = os.path.abspath(DOWNLOAD_DIR)
 caminho_formatado = pasta_completa.replace("\\", "/")
 
 print("\nSincronização finalizada!")
-print(f"Clique para abrir (Ctrl + Clique): file:///{caminho_formatado}")
+print(f"Em dia:      {len(em_dia)}")
+print(f"Baixados:    {len(baixados)}")
+print(f"Atualizados: {len(atualizados)}")
+print(f"Pendentes:   {len(pendentes)}")
+print(f"Falhas:      {len(falhas)}")
+
+if pendentes:
+    print("\nAinda sem versão para o 26.3:")
+    for m in pendentes:
+        print(f"  - {m}")
+
+if falhas:
+    print("\nFalha no download (rode de novo):")
+    for m in falhas:
+        print(f"  - {m}")
+
+print(f"\nClique para abrir (Ctrl + Clique): file:///{caminho_formatado}")
 os.startfile(pasta_completa)
